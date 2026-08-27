@@ -33,6 +33,16 @@ DEVICE_NAME=""
 # falls back to an ephemeral port while the receiver holds it.
 QS_PORT="35353"
 
+# One-shot modes beside the receiver supervisor: `check-firewall` reports
+# whether ufw would drop the phone's direct TCP connect to the receiver
+# port (and the exact command that would fix it); `fix-firewall` runs that
+# command under pkexec. Both parse the same flags and exit after one JSON
+# line on stdout.
+MODE="receive"
+case "${1-}" in
+  check-firewall|fix-firewall) MODE="$1"; shift ;;
+esac
+
 while (( $# > 0 )); do
   case "$1" in
     --out)
@@ -50,6 +60,48 @@ done
 if ! command -v jq >/dev/null 2>&1; then
   echo "omashare-helper: jq is required" >&2
   exit 69
+fi
+
+# Only ufw is detected; other firewalls are reported as absent. ufw's live
+# config is world-readable, and UFW_DIR lets the tests point at fixtures.
+UFW_DIR="${UFW_DIR:-/etc/ufw}"
+UFW_BIN="$(command -v ufw 2>/dev/null || true)"
+PKEXEC_BIN="$(command -v pkexec 2>/dev/null || echo /usr/bin/pkexec)"
+
+fw_rule_present() {
+  [[ -f $UFW_DIR/user.rules ]] || return 0
+  grep -Eq -- "-p tcp .*--dport $QS_PORT.*-j ACCEPT" \
+    "$UFW_DIR/user.rules" "$UFW_DIR/before.rules" 2>/dev/null
+}
+
+fw_state() {
+  FW_KIND="none"; FW_OPEN=true; FW_FIX=""
+  [[ -n $UFW_BIN ]] || return
+  FW_KIND="ufw"
+  grep -q '^ENABLED=yes' "$UFW_DIR/ufw.conf" 2>/dev/null || return
+  fw_rule_present && return
+  FW_OPEN=false
+  FW_FIX="$PKEXEC_BIN $UFW_BIN allow in $QS_PORT/tcp comment 'omaShare Quick Share'"
+}
+
+if [[ $MODE == check-firewall ]]; then
+  fw_state
+  printf '%s\n' "$(jq -cn --arg k "$FW_KIND" --argjson o "$FW_OPEN" \
+    --argjson p "$QS_PORT" --arg f "$FW_FIX" \
+    '{event:"firewall",firewall:$k,portOpen:$o,port:$p,fixCommand:$f}')"
+  exit 0
+fi
+
+if [[ $MODE == fix-firewall ]]; then
+  fw_state
+  if [[ $FW_OPEN == true ]]; then
+    printf '%s\n' "$(jq -cn --argjson p "$QS_PORT" \
+      '{event:"firewall_fixed",port:$p,alreadyOpen:true}')"
+    exit 0
+  fi
+  echo "omashare-helper: $FW_FIX" >&2
+  "$PKEXEC_BIN" "$UFW_BIN" allow in "$QS_PORT/tcp" comment 'omaShare Quick Share'
+  exit $?
 fi
 
 # The user-local install locations come first, and every candidate is probed
@@ -183,11 +235,15 @@ QS_PID=""
 STDIN_PIPER=$!
 
 # Tag and forward every line of a file until `tail` sees its pid go away.
+# OMASHARE_DEBUG=1 additionally appends the raw lines to $WORKDIR for
+# troubleshooting lost events.
 reader() { # $1 tag, $2 file, $3 qs pid
   local tag="$1" file="$2" pid="$3" line
+  [[ -z ${OMASHARE_DEBUG-} ]] || exec 2>>"${TMPDIR:-/tmp}/omashare-dbg.$$.$tag"
   tail -n +1 -f --pid="$pid" -- "$file" 2>/dev/null |
     while IFS= read -r line; do
       printf '%s\t%s\n' "$tag" "$line" >&9
+      [[ -z ${OMASHARE_DEBUG-} ]] || printf 'fwd\t%s\twrc=%s\n' "$line" "$?" >&2
     done
   printf 'X\t%s\n' "$tag" >&9
 }
@@ -258,17 +314,25 @@ run_receiver() {
 
   # The read is timed out: a TERM to the process group can kill the readers
   # before they emit their end markers, in which case the fifo goes quiet and
-  # an unbounded read would block the shutdown forever.
-  local tag payload
+  # an unbounded read would block the shutdown forever. A timed-out read can
+  # still consume a partial line (the fifo write raced the deadline), so
+  # partials are carried and glued to the next chunk instead of dropped.
+  local tag payload raw carried=""
   while :; do
-    if ! IFS=$'\t' read -r -t 1 tag payload <&8; then
-      if (( SHUTDOWN )) || ! kill -0 "$QS_PID" 2>/dev/null; then
-        break
-      fi
+    if IFS= read -r -t 1 raw <&8; then
+      raw="$carried$raw"
+      carried=""
+      tag="${raw%%$'\t'*}"
+      payload="${raw#*$'\t'}"
+      [[ -z ${OMASHARE_DEBUG-} ]] || printf 'main\t[%s]\t[%s]\n' "$tag" "$payload" >&2
+      dispatch_line "$tag" "$payload"
+      (( STREAMS_ENDED >= 2 )) && break
       continue
     fi
-    dispatch_line "$tag" "$payload"
-    (( STREAMS_ENDED >= 2 )) && break
+    [[ -z ${raw-} ]] || carried="$carried$raw"
+    if (( SHUTDOWN )) || ! kill -0 "$QS_PID" 2>/dev/null; then
+      break
+    fi
   done
 
   kill "$QS_PID" 2>/dev/null
@@ -283,11 +347,18 @@ run_receiver() {
 
 sleep_interruptible() { # $1 seconds; returns early once a command arrives
   local end=$(( $(date +%s) + $1 ))
-  local tag payload
+  local tag payload raw carried=""
   while :; do
     (( $(date +%s) >= end )) && return
-    if IFS=$'\t' read -r -t 0.5 tag payload <&8; then
+    if IFS= read -r -t 0.5 raw <&8; then
+      raw="$carried$raw"
+      carried=""
+      tag="${raw%%$'\t'*}"
+      payload="${raw#*$'\t'}"
       dispatch_line "$tag" "$payload"
+    else
+      # Same partial-line carry as the receiver loop's timed-out read.
+      [[ -z ${raw-} ]] || carried="$carried$raw"
     fi
     (( SHUTDOWN )) && return
   done

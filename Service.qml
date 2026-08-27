@@ -52,6 +52,15 @@ Item {
   property int restartAttempts: 0
   property int pendingFiles: 0
 
+  // Firewall state probed by the helper: phones connect directly to the
+  // advertised TCP port, which a default-deny ufw drops. `firewallAction`
+  // is "", "running", "denied", or "failed" while the fix is in flight.
+  property bool firewallBlocked: false
+  property int firewallPort: 0
+  property string firewallFixCommand: ""
+  property string firewallAction: ""
+  property string firewallActionDetail: ""
+
   // Recent incoming files, newest last. `qs` reports a path per saved file;
   // sizes are not available from the CLI, so keep the list lean.
   property var recent: []
@@ -147,6 +156,21 @@ Item {
     var at = value.lastIndexOf("/")
     if (at <= 0) return
     Quickshell.execDetached(["xdg-open", value.substring(0, at)])
+  }
+
+  // Runs the pkexec-guarded ufw command reported by `check-firewall`.
+  // The polkit agent prompts for the password; exit 126 means dismissed.
+  function fixFirewall() {
+    if (fwFix.running || !firewallBlocked) return
+    firewallAction = "running"
+    firewallActionDetail = ""
+    fwFix.command = [helperPath, "fix-firewall"]
+    fwFix.running = true
+  }
+
+  function recheckFirewall() {
+    fwProbe.running = false
+    fwProbeKickTimer.restart()
   }
 
   function rescanQs() {
@@ -295,6 +319,56 @@ Item {
     interval: 150
     repeat: false
     onTriggered: qsProbe.running = true
+  }
+
+  // Whether the host firewall would drop the phone's direct TCP connect
+  // to the receiver port (ufw with default-deny input, no allow rule).
+  // `check-firewall` prints one JSON line with the port state and the
+  // exact command that would fix it, so the UI can show it verbatim.
+  Process {
+    id: fwProbe
+    running: true
+    command: [root.helperPath, "check-firewall"]
+    stdout: StdioCollector {
+      id: fwProbeStdout
+      waitForEnd: true
+      onStreamFinished: {
+        var ev = Model.parseLine(String(text || ""))
+        if (ev && ev.event === "firewall") {
+          root.firewallBlocked = !ev.portOpen
+          root.firewallPort = ev.port || 0
+          root.firewallFixCommand = String(ev.fixCommand || "")
+        }
+      }
+    }
+    stderr: StdioCollector { waitForEnd: true }
+  }
+
+  Timer {
+    id: fwProbeKickTimer
+    interval: 150
+    repeat: false
+    onTriggered: fwProbe.running = true
+  }
+
+  // The fix itself: the helper execs pkexec(ufw allow …), the polkit
+  // agent asks for the password, and 126 means the prompt was dismissed.
+  Process {
+    id: fwFix
+    running: false
+    command: []
+    stdout: StdioCollector { id: fwFixStdout; waitForEnd: true }
+    stderr: StdioCollector { id: fwFixStderr; waitForEnd: true }
+    onExited: function(exitCode) {
+      if (exitCode === 0) {
+        root.firewallAction = ""
+        root.firewallActionDetail = ""
+        root.recheckFirewall()
+        return
+      }
+      root.firewallAction = exitCode === 126 ? "denied" : "failed"
+      root.firewallActionDetail = String(fwFixStderr.text || fwFixStdout.text || "").trim()
+    }
   }
 
   // Writing to Process.running replaces its declarative binding, so a restart

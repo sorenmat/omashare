@@ -257,6 +257,102 @@ Panel {
         width: parent.width
         spacing: Style.space(12)
 
+        // firewall: phones connect straight to the advertised TCP port,
+        // which a default-deny ufw drops. Offer the fix up front and show
+        // the exact command the button runs (pkexec asks for the password).
+        Column {
+          visible: root.engine !== null && root.engine.firewallBlocked
+          width: parent.width
+          spacing: Style.space(8)
+
+          Text {
+            text: "The firewall is blocking incoming transfers"
+            color: root.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            font.bold: true
+            width: parent.width
+            wrapMode: Text.WordWrap
+          }
+          Text {
+            text: "Phones connect directly to this machine on TCP port "
+              + (root.engine ? root.engine.firewallPort : 0)
+              + ". ufw's default-deny policy drops that connection, so transfers fall back to slow Bluetooth or fail. Clicking below asks for your password and runs exactly this:"
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            width: parent.width
+            wrapMode: Text.WordWrap
+          }
+
+          BorderSurface {
+            width: parent.width
+            implicitHeight: fwCmdRow.implicitHeight + Style.space(10)
+            radius: Style.cornerRadius
+            color: Style.normalFillFor(root.foreground)
+            borderSpec: Border.none()
+
+            Row {
+              id: fwCmdRow
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              anchors.leftMargin: Style.space(10)
+              anchors.rightMargin: Style.space(10)
+              spacing: Style.space(8)
+              width: parent.width
+
+              Text {
+                text: root.engine ? root.engine.firewallFixCommand : ""
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                elide: Text.ElideRight
+                width: parent.width - Style.space(16)
+              }
+            }
+          }
+
+          Button {
+            text: root.engine && root.engine.firewallAction === "running"
+              ? "Waiting for authorization…"
+              : "Allow incoming TCP " + (root.engine ? root.engine.firewallPort : 0)
+            background: Color.accent
+            foreground: Color.background
+            enabled: root.engine && root.engine.firewallAction !== "running"
+            opacity: enabled ? 1.0 : 0.7
+            onClicked: if (root.engine) root.engine.fixFirewall()
+          }
+
+          Text {
+            visible: root.engine && root.engine.firewallAction === "running"
+            text: "A password prompt should have opened — nothing changes until you approve it."
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            width: parent.width
+            wrapMode: Text.WordWrap
+          }
+          Text {
+            visible: root.engine && root.engine.firewallAction !== "" && root.engine.firewallAction !== "running"
+            text: root.engine && root.engine.firewallAction === "denied"
+              ? "Cancelled — no changes were made."
+              : "The command failed:" + (root.engine && root.engine.firewallActionDetail !== ""
+                  ? "\n" + root.engine.firewallActionDetail : "")
+            color: root.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            width: parent.width
+            wrapMode: Text.WordWrap
+          }
+
+          Button {
+            text: "Check again"
+            foreground: root.foreground
+            onClicked: if (root.engine) root.engine.recheckFirewall()
+          }
+        }
+
         // receiver
         Row {
           width: parent.width
