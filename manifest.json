@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "smo.omashare",
+  "name": "OmaShare",
+  "version": "1.0.0",
+  "author": "smo",
+  "license": "MIT",
+  "description": "Receive and send files with your Android phone over Google Quick Share (Nearby Share), native to the Omarchy bar.",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Quick Share",
+    "description": "Receive files from your Android phone over Quick Share",
+    "category": "Network",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "receiverEnabled": true,
+      "deviceName": "",
+      "destinationDir": ""
+    },
+    "schema": [
+      {
+        "key": "receiverEnabled",
+        "type": "boolean",
+        "label": "Keep receiver running",
+        "description": "Stay discoverable so phones can send Quick Share files",
+        "defaultValue": true
+      },
+      {
+        "key": "deviceName",
+        "type": "string",
+        "label": "Device name shown on phones",
+        "description": "Name shown in the phone's Quick Share picker. Default: this machine's hostname",
+        "defaultValue": ""
+      },
+      {
+        "key": "destinationDir",
+        "type": "string",
+        "label": "Save received files to",
+        "description": "Directory for incoming files. Default: ~/Downloads",
+        "defaultValue": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Fake `qs` (martinalderson/qs) for helper tests. Mimics the real CLI's
+# argument surface and the observed output formats, then plays back one
+# scripted transfer and keeps listening until it is killed.
+
+set -u
+
+case "${1-}" in
+  --version)
+    echo "qs 0.9.9"
+    exit 0
+    ;;
+  receive)
+    shift
+    OUT=""
+    NAME=""
+    while (( $# > 0 )); do
+      case "$1" in
+        -o|--out) OUT="${2-}"; shift 2 ;;
+        --name) NAME="${2-}"; shift 2 ;;
+        -y|--yes|--once) shift ;;
+        *) shift ;;
+      esac
+    done
+    echo "Receiving as \"$NAME\" — send a file from your phone…  (Ctrl-C to stop)" >&2
+    sleep 1
+    echo "Incoming from \"Pixel 9\"" >&2
+    sleep 0.4
+    if [[ -n $OUT ]]; then
+      mkdir -p "$OUT"
+      f="$OUT/photo.jpg"
+      echo "fake-jpeg" >"$f"
+      echo "$f"
+    fi
+    sleep 0.2
+    echo "✓ Received 1 file" >&2
+    trap 'exit 0' TERM
+    while :; do sleep 1; done
+    ;;
+  devices)
+    shift
+    echo '[{"name":"Pixel 9","id":"192.168.1.50:53317","ip":"192.168.1.50","port":53317,"type":"android"},{"name":"Desk","id":"192.168.1.10:53317","ip":"192.168.1.10","port":53317,"type":"desktop"}]'
+    exit 0
+    ;;
+  send)
+    shift
+    while (( $# > 0 )); do
+      case "$1" in
+        --to) TO="${2-}"; shift 2 ;;
+        --timeout) shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    echo "sent to ${TO-?}" >&2
+    exit 0
+    ;;
+  *)
+    echo "fakeqs: unknown command ${1-}" >&2
+    exit 64
+    ;;
+esac

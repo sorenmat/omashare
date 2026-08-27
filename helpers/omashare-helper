@@ -1,0 +1,287 @@
+#!/usr/bin/env bash
+# omashare-helper — supervises `qs receive` and reports what it does as JSON
+# lines on stdout. Commands arrive as JSON lines on stdin:
+#
+#   {"command":"shutdown"}
+#
+# Events on stdout (one JSON object per line):
+#   {"event":"ready","version","deviceName","outDir","qsVersion"}
+#   {"event":"listening"}
+#   {"event":"transfer_starting","sender","pin"}
+#   {"event":"file_received","path"}
+#   {"event":"transfer_done","fileCount"}
+#   {"event":"transfer_failed","reason"}
+#   {"event":"receiver_error","code","detail"}
+#   {"event":"receiver_restarting","delay"}
+#   {"event":"error","code":"qs_missing","detail"}
+#   {"event":"stopped"}
+#
+# The receiver is restarted automatically after a crash, with capped
+# exponential backoff. Only a shutdown command or a signal stops the loop.
+
+set -u
+
+VERSION="1.0.0"
+INSTALL_HINT="Install the qs CLI: cargo install --git https://github.com/martinalderson/qs"
+
+OUT_DIR=""
+DEVICE_NAME=""
+
+while (( $# > 0 )); do
+  case "$1" in
+    --out)
+      OUT_DIR="${2-}"; shift 2 ;;
+    --name)
+      DEVICE_NAME="${2-}"; shift 2 ;;
+    *)
+      echo "omashare-helper: unknown argument: $1" >&2
+      exit 64 ;;
+  esac
+done
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "omashare-helper: jq is required" >&2
+  exit 69
+fi
+
+# The user-local install locations come first, and every candidate is probed
+# with --version before it is trusted: on this system `qs` on PATH is
+# Quickshell, which happens to accept a `receive`-looking argument and must
+# not be run as the receiver.
+resolve_qs() {
+  local p v
+  for p in "$HOME/.cargo/bin/qs" "$HOME/.local/bin/qs" "$(command -v qs 2>/dev/null)"; do
+    [[ -n $p && -x $p ]] || continue
+    v="$("$p" --version 2>/dev/null | head -n1)" || continue
+    if [[ $v =~ ^qs\ [0-9] ]]; then
+      printf '%s' "$p"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# ---------------------------------------------------------------- events
+
+emit() { printf '%s\n' "$1"; }
+
+emit_ready() {
+  emit "$(jq -cn --arg v "$VERSION" --arg n "$DEVICE_NAME" --arg o "$OUT_DIR" --arg q "$QS_VERSION" \
+    '{event:"ready",version:$v,deviceName:$n,outDir:$o,qsVersion:$q}')"
+}
+
+emit_listening() {
+  emit '{"event":"listening"}'
+}
+
+emit_transfer_starting() { # $1 sender, $2 pin (may be empty)
+  emit "$(jq -cn --arg s "$1" --arg p "${2-}" '{event:"transfer_starting",sender:$s,pin:$p}')"
+}
+
+emit_file_received() { # $1 path
+  emit "$(jq -cn --arg p "$1" '{event:"file_received",path:$p}')"
+}
+
+emit_transfer_done() { # $1 file count
+  local n="${1-0}"
+  [[ $n =~ ^[0-9]+$ ]] || n=0
+  emit "$(jq -cn --argjson n "$n" '{event:"transfer_done",fileCount:$n}')"
+}
+
+emit_transfer_failed() { # $1 reason
+  emit "$(jq -cn --arg r "$1" '{event:"transfer_failed",reason:$r}')"
+}
+
+emit_receiver_error() { # $1 code, $2 detail
+  emit "$(jq -cn --argjson c "$1" --arg d "$2" '{event:"receiver_error",code:$c,detail:$d}')"
+}
+
+emit_receiver_restarting() { # $1 delay seconds
+  emit "$(jq -cn --argjson d "$1" '{event:"receiver_restarting",delay:$d}')"
+}
+
+emit_qs_missing() {
+  emit "$(jq -cn --arg d "$INSTALL_HINT" '{event:"error",code:"qs_missing",detail:$d}')"
+}
+
+emit_stopped() {
+  emit '{"event":"stopped"}'
+}
+
+# ---------------------------------------------------------------- setup
+
+QS_BIN="$(resolve_qs)" || {
+  emit_qs_missing
+  exit 3
+}
+
+QS_VERSION="$("$QS_BIN" --version 2>/dev/null | head -n1)" || QS_VERSION=""
+
+WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/omashare.XXXXXX")" || exit 70
+trap 'rm -rf "$WORKDIR"' EXIT
+
+OUT="$WORKDIR/out"
+ERRF="$WORKDIR/err"
+EVT="$WORKDIR/events"
+: >"$OUT"
+: >"$ERRF"
+mkfifo "$EVT" || exit 70
+
+# fd 8: read side of the event pipe, fd 9: write side. Both are held open by
+# this process for its whole life so the event reader below never sees EOF;
+# readers for a dead `qs` announce themselves with an "X" marker instead.
+exec 8<> "$EVT"
+exec 9<> "$EVT"
+
+# Background subshells of a non-interactive shell get their stdin from
+# /dev/null, so grab the helper's real stdin on fd 7 before forking; the
+# forwarder below reads commands from fd 7.
+exec 7<&0
+
+SHUTDOWN=0
+QS_PID=""
+
+# Forward stdin commands onto the event pipe as "C" lines.
+(
+  while IFS= read -r cmd <&7; do
+    printf 'C\t%s\n' "$cmd" >&9
+  done
+) &
+STDIN_PIPER=$!
+
+# Tag and forward every line of a file until `tail` sees its pid go away.
+reader() { # $1 tag, $2 file, $3 qs pid
+  local tag="$1" file="$2" pid="$3" line
+  tail -n +1 -f --pid="$pid" -- "$file" 2>/dev/null |
+    while IFS= read -r line; do
+      printf '%s\t%s\n' "$tag" "$line" >&9
+    done
+  printf 'X\t%s\n' "$tag" >&9
+}
+
+# ---------------------------------------------------------------- parsing
+
+LAST_ERROR=""
+
+on_err_line() {
+  local line="$1" sender
+  if [[ $line =~ ^Incoming\ from\ (.+)(\ \ \(PIN\ ([0-9]+)\))?$ ]]; then
+    sender="${BASH_REMATCH[1]//\"/}" # qs quotes the sender: Incoming from "Pixel 9"
+    emit_transfer_starting "$sender" "${BASH_REMATCH[3]-}"
+  elif [[ $line =~ ^✓\ Received\ ([0-9]+)\ file ]]; then
+    emit_transfer_done "${BASH_REMATCH[1]}"
+  elif [[ $line == "✓ Received"* ]]; then
+    emit_transfer_done 0
+  elif [[ $line =~ ^Transfer\ (cancelled|rejected|disconnected)\.$ ]]; then
+    emit_transfer_failed "${BASH_REMATCH[1]}"
+  elif [[ $line == "Receiving as "* ]]; then
+    emit_listening
+  elif [[ $line == "error: "* ]]; then
+    LAST_ERROR="${line#error: }"
+  fi
+}
+
+handle_command() {
+  local command
+  command="$(jq -r '.command // empty' <<<"$1" 2>/dev/null)" || command=""
+  case "$command" in
+    shutdown)
+      SHUTDOWN=1
+      [[ -n $QS_PID ]] && kill "$QS_PID" 2>/dev/null
+      kill "$STDIN_PIPER" 2>/dev/null
+      ;;
+  esac
+}
+
+dispatch_line() { # $1 tag, $2 payload
+  case "$1" in
+    S) emit_file_received "$2" ;;
+    E) on_err_line "$2" ;;
+    C) handle_command "$2" ;;
+    X) STREAMS_ENDED=$(( STREAMS_ENDED + 1 )) ;;
+  esac
+}
+
+# ---------------------------------------------------------------- receiver loop
+
+run_receiver() {
+  : >"$OUT"
+  : >"$ERRF"
+  LAST_ERROR=""
+  STREAMS_ENDED=0
+
+  "$QS_BIN" receive --yes ${OUT_DIR:+"-o" "$OUT_DIR"} ${DEVICE_NAME:+"--name" "$DEVICE_NAME"} \
+    >"$OUT" 2>"$ERRF" &
+  QS_PID=$!
+
+  reader S "$OUT" "$QS_PID" &
+  READER_S=$!
+  reader E "$ERRF" "$QS_PID" &
+  READER_E=$!
+
+  # The read is timed out: a TERM to the process group can kill the readers
+  # before they emit their end markers, in which case the fifo goes quiet and
+  # an unbounded read would block the shutdown forever.
+  local tag payload
+  while :; do
+    if ! IFS=$'\t' read -r -t 1 tag payload <&8; then
+      if (( SHUTDOWN )) || ! kill -0 "$QS_PID" 2>/dev/null; then
+        break
+      fi
+      continue
+    fi
+    dispatch_line "$tag" "$payload"
+    (( STREAMS_ENDED >= 2 )) && break
+  done
+
+  kill "$QS_PID" 2>/dev/null
+  wait "$QS_PID" 2>/dev/null
+  QS_EXIT=$?
+  # Wait only for the readers: the stdin forwarder must outlive the loop, and
+  # a bare `wait` would block on it.
+  wait "$READER_S" "$READER_E" 2>/dev/null
+  QS_PID=""
+  return 0
+}
+
+sleep_interruptible() { # $1 seconds; returns early once a command arrives
+  local end=$(( $(date +%s) + $1 ))
+  local tag payload
+  while :; do
+    (( $(date +%s) >= end )) && return
+    if IFS=$'\t' read -r -t 0.5 tag payload <&8; then
+      dispatch_line "$tag" "$payload"
+    fi
+    (( SHUTDOWN )) && return
+  done
+}
+
+trap 'SHUTDOWN=1; [[ -n $QS_PID ]] && kill "$QS_PID" 2>/dev/null; kill "$STDIN_PIPER" 2>/dev/null' TERM INT
+
+emit_ready
+
+BACKOFF=1
+while :; do
+  run_receiver
+  if (( SHUTDOWN )); then
+    emit_stopped
+    break
+  fi
+
+  if (( QS_EXIT != 0 )); then
+    if [[ -n $LAST_ERROR ]]; then
+      emit_receiver_error "$QS_EXIT" "$LAST_ERROR"
+    else
+      emit_receiver_error "$QS_EXIT" "qs receive exited with code $QS_EXIT"
+    fi
+  fi
+  emit_receiver_restarting "$BACKOFF"
+  sleep_interruptible "$BACKOFF"
+  (( SHUTDOWN )) && { emit_stopped; break; }
+  BACKOFF=$(( BACKOFF * 2 ))
+  (( BACKOFF > 15 )) && BACKOFF=15
+done
+
+exec 9>&-
+exec 8>&-
+exit 0
