@@ -69,7 +69,13 @@ Item {
   // The helper is restarted when receiver settings change: command identity
   // is what Quickshell's Process uses to decide that a running child has to
   // be replaced, so fold the settings that feed it into the command.
+  // The env indirection injects RUST_LOG into `qs receive`: Quickshell's
+  // Process has no environment property, and this keeps the receiver's
+  // protocol activity (incl. the Wi-Fi bandwidth upgrade) visible in the
+  // shell log via the helper's stderr.
   readonly property var helperCommand: [
+    "/usr/bin/env",
+    "RUST_LOG=info,rqs_lib=debug,mdns_sd=warn",
     helperPath,
     destinationDir !== "" ? "--out" : "",
     destinationDir !== "" ? destinationDir : "",

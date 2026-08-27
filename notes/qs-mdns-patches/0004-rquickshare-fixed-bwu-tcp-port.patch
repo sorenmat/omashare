@@ -1,0 +1,19 @@
+diff --git i/core_lib/src/hdl/inbound.rs w/core_lib/src/hdl/inbound.rs
+index 4f3c67f..f5b03ee 100644
+--- i/core_lib/src/hdl/inbound.rs
++++ w/core_lib/src/hdl/inbound.rs
+@@ -1692,7 +1692,13 @@ impl InboundRequest<crate::hdl::MigratableStream> {
+     pub async fn do_bwu(&mut self) -> Result<(), anyhow::Error> {
+         use location_nearby_connections::bandwidth_upgrade_negotiation_frame::EventType;
+ 
+-        let listener = tokio::net::TcpListener::bind("0.0.0.0:0").await?;
++        // Bind a fixed port when possible so hosts running a default-deny
++        // firewall can allow the Wi-Fi upgrade with a single rule; fall back
++        // to an ephemeral port when it is already taken.
++        let listener = match tokio::net::TcpListener::bind("0.0.0.0:35353").await {
++            Ok(l) => l,
++            Err(_) => tokio::net::TcpListener::bind("0.0.0.0:0").await?,
++        };
+         let port = listener.local_addr()?.port();
+ 
+         // Offer WIFI_LAN over the encrypted BLE channel.

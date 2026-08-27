@@ -34,6 +34,37 @@ IP:port: the phone shows *waiting…* and the transfer fails.
    query.
 3. `0003-qs-*.patch` — qs: point `rqs_lib` at the local rquickshare and
    add a `[patch]` entry for the local mdns-sd.
+4. `0004-rquickshare-*.patch` — rquickshare: bind the Wi-Fi bandwidth
+   upgrade (BWU) listener to a **fixed TCP port 35353** (ephemeral
+   fallback), so a host firewall can allow the phone's inbound upgrade
+   connection with a single rule. See the next section for why that is
+   needed.
+
+## Wi-Fi speed needs one firewall rule
+
+A phone→machine transfer starts over the BLE connect-back channel and then
+upgrades to Wi-Fi: `qs` binds a TCP listener, offers the port to the phone
+over the encrypted BLE channel (`UpgradePathAvailable`), and the phone
+connects to that port for the payload. On a default-deny host firewall
+(e.g. ufw with its stock input policy `DROP`) that TCP connect is silently
+dropped — discovery still works because ufw's stock `before.rules` allows
+multicast UDP 5353 (mDNS), and BLE is not IP — so `do_bwu()` times out
+after 15 s and the whole file crawls over BLE at ≈150 KB/s.
+
+Evidence on this machine: `[UFW BLOCK]` kernel log lines with the phone's
+SYNs to the exact ephemeral ports qs had offered, e.g.
+`SRC=192.168.50.208 DST=192.168.50.2 PROTO=TCP DPT=44715 SYN`.
+
+With patch 0004 the listener is always on 35353/tcp, so allow it once:
+
+```sh
+sudo ufw allow in 35353/tcp comment 'omaShare Quick Share Wi-Fi upgrade'
+```
+
+After the upgrade completes, transfers run at Wi-Fi speed. The receiver
+logs the handoff (`BWU: phone connected over TCP from …`) into the shell
+journal — omaShare runs `qs receive` with
+`RUST_LOG=info,rqs_lib=debug,mdns_sd=warn`.
 
 ## Rebuilding qs from a clean machine
 
@@ -45,6 +76,7 @@ git clone -b unsolicited https://github.com/Martichou/mdns-sd
 cd qs-mdns-patches
 patch -p1 -d ../mdns-sd      < 0001-mdns-sd-*.patch
 patch -p1 -d ../rquickshare  < 0002-rquickshare-*.patch
+patch -p1 -d ../rquickshare  < 0004-rquickshare-*.patch
 patch -p1 -d ../qs           < 0003-qs-*.patch
 cd ../qs
 cargo install --path . --bin qs --root "$HOME/.local"
@@ -68,11 +100,11 @@ Expected end-to-end: the phone completes transfers;
 
 ## Caveats
 
-- Transfers on this build are slow (≈150 KB/s observed). The current
-  rquickshare branch receives over the BLE "connect-back" path first and
-  is supposed to upgrade to Wi-Fi bandwidth afterwards; that upgrade does
-  not seem to complete on this machine, so data stays on BLE. Upstream may
-  fix this — re-check the branch before keeping these patches long-term.
+- The 0004 BWU port (35353/tcp) is a local choice; if something else on
+  the host claims it, qs falls back to an ephemeral port and the firewall
+  exception no longer matches (transfer then stays on BLE — slow but
+  working). Pick another port in the patch and the `ufw allow` rule if
+  35353 ever collides.
 - When upstream lands the fixes, drop the local patches and
   `cargo install --git https://github.com/martinalderson/qs --bin qs
   --root ~/.local` again.
