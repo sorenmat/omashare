@@ -245,6 +245,7 @@ Panel {
 
         Button {
           text: "Check again"
+          iconText: "󰔒"
           foreground: root.foreground
           onClicked: if (root.engine) root.engine.rescanQs()
         }
@@ -317,6 +318,7 @@ Panel {
             text: root.engine && root.engine.firewallAction === "running"
               ? "Waiting for authorization…"
               : "Allow incoming TCP " + (root.engine ? root.engine.firewallPort : 0)
+            iconText: "󰓇"
             background: Color.accent
             foreground: Color.background
             enabled: root.engine && root.engine.firewallAction !== "running"
@@ -348,6 +350,7 @@ Panel {
 
           Button {
             text: "Check again"
+            iconText: "󰔒"
             foreground: root.foreground
             onClicked: if (root.engine) root.engine.recheckFirewall()
           }
@@ -402,6 +405,7 @@ Panel {
 
         Button {
           text: "Open save folder"
+          iconText: "󰝰"
           foreground: root.foreground
           onClicked: if (root.engine) root.engine.openDestination()
         }
@@ -417,17 +421,28 @@ Panel {
             width: parent.width
             spacing: Style.space(8)
 
-            Text {
-              text: "Send to phone"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              font.bold: true
+            Row {
+              spacing: Style.space(6)
+
+              Text {
+                text: "󰍂"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+              }
+              Text {
+                text: "Send to phone"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                font.bold: true
+              }
             }
             Item { width: scanButton.implicitWidth + Style.space(8) }
             Button {
               id: scanButton
               text: root.engine.scanning ? "Scanning…" : "Scan for devices"
+              iconText: "󰍉"
               foreground: root.foreground
               enabled: !root.engine.scanning
               opacity: root.engine.scanning ? 0.6 : 1.0
@@ -540,6 +555,7 @@ Panel {
             Button {
               id: sendButton
               text: root.engine && root.engine.sending ? "Sending…" : "Send"
+              iconText: "󰅗"
               foreground: root.foreground
               enabled: !root.engine.sending
               opacity: root.engine.sending ? 0.6 : 1.0
@@ -556,12 +572,22 @@ Panel {
           spacing: Style.space(6)
           visible: recentList.count > 0
 
-          Text {
-            text: "Recent files"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            font.bold: true
+          Row {
+            spacing: Style.space(6)
+
+            Text {
+              text: "󰈠"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+            }
+            Text {
+              text: "Recent files"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              font.bold: true
+            }
           }
 
           Repeater {
@@ -636,12 +662,22 @@ Panel {
           width: parent.width
           spacing: Style.space(8)
 
-          Text {
-            text: "Receiver settings"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            font.bold: true
+          Row {
+            spacing: Style.space(6)
+
+            Text {
+              text: "󰒓"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+            }
+            Text {
+              text: "Receiver settings"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              font.bold: true
+            }
           }
 
           Column {
@@ -686,6 +722,7 @@ Panel {
 
           Button {
             text: "Save settings"
+            iconText: "󰒓"
             foreground: root.foreground
             onClicked: {
               if (!root.engine) return

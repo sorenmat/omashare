@@ -28,9 +28,9 @@ OUT_DIR=""
 DEVICE_NAME=""
 # Phones connect straight to the mDNS-advertised TCP port over Wi-Fi, so a
 # fixed port lets the host firewall allow it with a single rule (see
-# notes/qs-mdns-patches in the omaShare repo). 35353 is the port allowed
-# on this machine's ufw; the BWU listener (same port in the qs build)
-# falls back to an ephemeral port while the receiver holds it.
+# notes/qs-mdns-patches in the omaShare repo). The BWU listener (same port
+# in the qs build) falls back to an ephemeral port while the receiver
+# holds it.
 QS_PORT="35353"
 
 # One-shot modes beside the receiver supervisor: `check-firewall` reports
