@@ -64,7 +64,7 @@ at ≈150 KB/s — or the send fails outright.
 
 Evidence on this machine: `[UFW BLOCK]` kernel log lines with the phone's
 SYNs to the ports qs had advertised, e.g.
-`SRC=192.168.50.208 DST=192.168.50.2 PROTO=TCP DPT=46521 SYN`.
+`SRC=<phone-ip> DST=<this-host> PROTO=TCP DPT=<port> SYN`.
 
 The advertised port is random per start, so omaShare's helper runs
 `qs receive --port 35353` and the host allows that one port:
@@ -99,7 +99,7 @@ omarchy restart shell   # let the omaShare service respawn the receiver
 ```
 
 On this host the patched working copies already live at
-`/home/smo/code/{qs,rquickshare,mdns-sd}`; the installed
+`~/code/{qs,rquickshare,mdns-sd}`; the installed
 `~/.local/bin/qs` was built from them (2026-08-27).
 
 Verify the mDNS advertisement after restarting the shell (run on the

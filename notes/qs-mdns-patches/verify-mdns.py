@@ -9,6 +9,7 @@ IPv4 address.
 """
 import socket
 import struct
+import sys
 import time
 
 TYPE = "_FC9F5ED42C8A._tcp.local"
@@ -49,7 +50,12 @@ def q(name, qtype):
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(("0.0.0.0", 5353))
-wifi = "192.168.50.2"
+# The interface address to multicast on: argv override, else the source
+# address the kernel would pick for the mDNS group.
+probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+probe.connect(("224.0.0.251", 5353))
+wifi = sys.argv[1] if len(sys.argv) > 1 else probe.getsockname()[0]
+probe.close()
 grp = struct.pack("4s4s", socket.inet_aton("224.0.0.251"), socket.inet_aton(wifi))
 s.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, grp)
 s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
