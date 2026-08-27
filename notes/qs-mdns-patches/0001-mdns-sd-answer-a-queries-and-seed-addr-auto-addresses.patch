@@ -1,0 +1,51 @@
+diff --git i/src/service_daemon.rs w/src/service_daemon.rs
+index a90e70c..bfab82b 100644
+--- i/src/service_daemon.rs
++++ w/src/service_daemon.rs
+@@ -1161,7 +1161,18 @@ impl Zeroconf {
+     ///    Section, all of its newly registered resource records
+     ///
+     /// Zeroconf will then respond to requests for information about this service.
+-    fn register_service(&mut self, info: ServiceInfo) {
++    fn register_service(&mut self, mut info: ServiceInfo) {
++        // Seed addresses for addr-auto services from the interfaces that
++        // already existed at daemon startup: those interfaces never pass
++        // through add_new_interface(), which is the only other path that
++        // populates service addresses. Without this the service stays
++        // address-less and A queries go unanswered.
++        if info.is_addr_auto() {
++            for (_, if_sock) in self.intf_socks.iter() {
++                info.insert_ipaddr(if_sock.intf.ip());
++            }
++        }
++
+         // Check the service name length.
+         if let Err(e) = check_service_name_length(info.get_type(), self.service_name_len_max) {
+             error!("check_service_name_length: {}", &e);
+@@ -1759,7 +1770,25 @@ impl Zeroconf {
+             } else {
+                 if qtype == TYPE_A || qtype == TYPE_AAAA || qtype == TYPE_ANY {
+                     for service in self.my_services.values() {
+-                        if service.get_hostname() == question.entry.name.to_lowercase() {
++                        // Match the hostname case-insensitively (service
++                        // hostnames may be mixed-case, e.g. base64 instance
++                        // labels) and also accept the instance fullname, so
++                        // clients that resolve the instance name directly
++                        // get an address record. Parsed question names keep
++                        // their trailing dot while ServiceInfo's hostname
++                        // does not, so compare both trimmed.
++                        let qname = question.entry.name.trim_end_matches('.').to_lowercase();
++                        let matches = service
++                            .get_hostname()
++                            .trim_end_matches('.')
++                            .to_lowercase()
++                            == qname
++                            || service
++                                .get_fullname()
++                                .trim_end_matches('.')
++                                .to_lowercase()
++                                == qname;
++                        if matches {
+                             let intf_addrs = service.get_addrs_on_intf(&intf_sock.intf);
+                             if intf_addrs.is_empty() && (qtype == TYPE_A || qtype == TYPE_AAAA) {
+                                 let t = match qtype {

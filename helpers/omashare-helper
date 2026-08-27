@@ -26,6 +26,12 @@ INSTALL_HINT="Install the qs CLI: cargo install --git https://github.com/martina
 
 OUT_DIR=""
 DEVICE_NAME=""
+# Phones connect straight to the mDNS-advertised TCP port over Wi-Fi, so a
+# fixed port lets the host firewall allow it with a single rule (see
+# notes/qs-mdns-patches in the omaShare repo). 35353 is the port allowed
+# on this machine's ufw; the BWU listener (same port in the qs build)
+# falls back to an ephemeral port while the receiver holds it.
+QS_PORT="35353"
 
 while (( $# > 0 )); do
   case "$1" in
@@ -33,6 +39,8 @@ while (( $# > 0 )); do
       OUT_DIR="${2-}"; shift 2 ;;
     --name)
       DEVICE_NAME="${2-}"; shift 2 ;;
+    --port)
+      QS_PORT="${2-}"; shift 2 ;;
     *)
       echo "omashare-helper: unknown argument: $1" >&2
       exit 64 ;;
@@ -235,7 +243,7 @@ run_receiver() {
   LAST_ERROR=""
   STREAMS_ENDED=0
 
-  "$QS_BIN" receive --yes ${OUT_DIR:+"-o" "$OUT_DIR"} ${DEVICE_NAME:+"--name" "$DEVICE_NAME"} \
+  "$QS_BIN" receive --yes ${QS_PORT:+"--port" "$QS_PORT"} ${OUT_DIR:+"-o" "$OUT_DIR"} ${DEVICE_NAME:+"--name" "$DEVICE_NAME"} \
     >"$OUT" 2>"$ERRF" &
   QS_PID=$!
   # The stdin forwarder is the only member of this tree that quickshell does

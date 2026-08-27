@@ -119,11 +119,11 @@ omarchy plugin validate .    # manifest schema check
   mDNS receiver record and phones fail with *waiting → failed*. The
   `qs` on this machine is built with local fixes; see
   [`notes/qs-mdns-patches/`](notes/qs-mdns-patches/README.md).
-- Wi-Fi speed needs one firewall exception: the phone's inbound TCP
-  bandwidth-upgrade connect lands on port 35353 (local patch), which a
-  default-deny ufw drops — the transfer then falls back to BLE at
-  ≈150 KB/s. `sudo ufw allow in 35353/tcp` fixes it; details in
-  [`notes/qs-mdns-patches/`](notes/qs-mdns-patches/README.md).
+- Wi-Fi speed needs one firewall exception: phones connect directly to
+  the receiver's advertised TCP port, which omaShare pins to 35353; a
+  default-deny ufw drops that connect and the transfer falls back to
+  BLE at ≈150 KB/s or fails. `sudo ufw allow in 35353/tcp` fixes it;
+  details in [`notes/qs-mdns-patches/`](notes/qs-mdns-patches/README.md).
 - Quick Share requires both sides on the same Wi-Fi (or a connected
   network); the phone decides visibility.
 - The `recent files` list is per shell session.

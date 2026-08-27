@@ -20,12 +20,24 @@ IP:port: the phone shows *waiting…* and the transfer fails.
     mdns-sd's answer path lowercases the question name but compares it to
     the un-lowercased, mixed-case base64 hostname — a case-sensitivity
     bug that can never match.
+  - Later debugging showed even ANY responses carried **no A records at
+    all**: the fork only populates addr-auto service addresses in
+    `add_new_interface()`, which the daemon-startup interfaces never
+    pass through — so the registered service had no addresses to answer
+    with, whatever the question.
 
-## The fix (three small patches, in `qs-mdns-patches/`)
+## The fix (four small patches, in `qs-mdns-patches/`)
 
 1. `0001-mdns-sd-*.patch` — mdns-sd (`Martichou/mdns-sd`, branch
-   `unsolicited`): answer A/AAAA/ANY queries case-insensitively and also
-   when the question name is the instance fullname.
+   `unsolicited`): (a) answer A/AAAA/ANY queries case-insensitively,
+   trailing-dot-insensitively, and also when the question name is the
+   instance fullname — parsed question names keep their trailing dot
+   while `ServiceInfo`'s hostname does not, so naive comparisons never
+   match; (b) seed the addresses of addr-auto services at registration —
+   in this fork only `add_new_interface()` populates them, and the
+   interfaces that existed at daemon startup never pass through it, so
+   the service stayed address-less and even ANY responses carried no A
+   records.
 2. `0002-rquickshare-*.patch` — rquickshare
    (`martinalderson/rquickshare`, branch
    `feat/ble-receiver-connect-back`): use the instance fullname
@@ -42,29 +54,32 @@ IP:port: the phone shows *waiting…* and the transfer fails.
 
 ## Wi-Fi speed needs one firewall rule
 
-A phone→machine transfer starts over the BLE connect-back channel and then
-upgrades to Wi-Fi: `qs` binds a TCP listener, offers the port to the phone
-over the encrypted BLE channel (`UpgradePathAvailable`), and the phone
-connects to that port for the payload. On a default-deny host firewall
-(e.g. ufw with its stock input policy `DROP`) that TCP connect is silently
-dropped — discovery still works because ufw's stock `before.rules` allows
-multicast UDP 5353 (mDNS), and BLE is not IP — so `do_bwu()` times out
-after 15 s and the whole file crawls over BLE at ≈150 KB/s.
+A phone connects **directly over Wi-Fi TCP to the mDNS-advertised SRV
+port** — that is the standard Nearby Connections client behaviour. On a
+default-deny host firewall (ufw with its stock input policy `DROP`) that
+connect is silently dropped: discovery still works because ufw's stock
+`before.rules` allows multicast UDP 5353 (mDNS), and Bluetooth is not IP,
+so the phone falls back to the BLE connect-back path and the file crawls
+at ≈150 KB/s — or the send fails outright.
 
 Evidence on this machine: `[UFW BLOCK]` kernel log lines with the phone's
-SYNs to the exact ephemeral ports qs had offered, e.g.
-`SRC=192.168.50.208 DST=192.168.50.2 PROTO=TCP DPT=44715 SYN`.
+SYNs to the ports qs had advertised, e.g.
+`SRC=192.168.50.208 DST=192.168.50.2 PROTO=TCP DPT=46521 SYN`.
 
-With patch 0004 the listener is always on 35353/tcp, so allow it once:
+The advertised port is random per start, so omaShare's helper runs
+`qs receive --port 35353` and the host allows that one port:
 
 ```sh
-sudo ufw allow in 35353/tcp comment 'omaShare Quick Share Wi-Fi upgrade'
+sudo ufw allow in 35353/tcp comment 'omaShare Quick Share'
 ```
 
-After the upgrade completes, transfers run at Wi-Fi speed. The receiver
-logs the handoff (`BWU: phone connected over TCP from …`) into the shell
-journal — omaShare runs `qs receive` with
-`RUST_LOG=info,rqs_lib=debug,mdns_sd=warn`.
+With the port reachable the phone transfers over Wi-Fi from the start.
+For BLE-originated sessions rquickshare's bandwidth upgrade (patch 0004)
+also binds 35353 first — while the main listener holds it, it falls back
+to an ephemeral port, which the firewall then blocks (transfer stays on
+BLE: slow but working). The receiver logs the protocol into the shell
+journal (`RUST_LOG=info,rqs_lib=debug,mdns_sd=warn`), including
+`BWU: phone connected over TCP from …` when an upgrade does complete.
 
 ## Rebuilding qs from a clean machine
 
