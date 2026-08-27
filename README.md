@@ -115,6 +115,10 @@ omarchy plugin validate .    # manifest schema check
 
 - Receiving runs `qs receive` with auto-accept (`-y`); the receiver is
   discoverable to everyone on the network while enabled.
+- As of qs `a63bc7b` (Aug 2026), upstream `qs` advertises an unresolvable
+  mDNS receiver record and phones fail with *waiting → failed*. The
+  `qs` on this machine is built with local fixes; see
+  [`notes/qs-mdns-patches/`](notes/qs-mdns-patches/README.md).
 - Quick Share requires both sides on the same Wi-Fi (or a connected
   network); the phone decides visibility.
 - The `recent files` list is per shell session.

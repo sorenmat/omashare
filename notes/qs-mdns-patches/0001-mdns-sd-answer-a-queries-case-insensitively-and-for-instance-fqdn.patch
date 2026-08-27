@@ -1,0 +1,26 @@
+diff --git i/src/service_daemon.rs w/src/service_daemon.rs
+index a90e70c..bd9370d 100644
+--- i/src/service_daemon.rs
++++ w/src/service_daemon.rs
+@@ -1759,7 +1759,20 @@ impl Zeroconf {
+             } else {
+                 if qtype == TYPE_A || qtype == TYPE_AAAA || qtype == TYPE_ANY {
+                     for service in self.my_services.values() {
+-                        if service.get_hostname() == question.entry.name.to_lowercase() {
++                        // Match the hostname case-insensitively (service
++                        // hostnames may be mixed-case, e.g. base64 instance
++                        // labels) and also accept the instance fullname, so
++                        // clients that resolve the instance name directly
++                        // get an address record.
++                        let qname = question.entry.name.to_lowercase();
++                        let matches =
++                            service.get_hostname().to_lowercase() == qname
++                                || service
++                                    .get_fullname()
++                                    .trim_end_matches('.')
++                                    .to_lowercase()
++                                    == qname;
++                        if matches {
+                             let intf_addrs = service.get_addrs_on_intf(&intf_sock.intf);
+                             if intf_addrs.is_empty() && (qtype == TYPE_A || qtype == TYPE_AAAA) {
+                                 let t = match qtype {

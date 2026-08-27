@@ -1,0 +1,25 @@
+diff --git i/core_lib/src/hdl/mdns.rs w/core_lib/src/hdl/mdns.rs
+index c492de9..e402f9c 100644
+--- i/core_lib/src/hdl/mdns.rs
++++ w/core_lib/src/hdl/mdns.rs
+@@ -137,14 +137,18 @@ impl MDnsServer {
+         // If that is not desired, derive host_name, etc. via some other means
+         let name = gen_mdns_name(endpoint_id);
+         let device_name = DEVICE_NAME.read().unwrap().clone();
+-        info!("Broadcasting with: device_name={device_name}, host_name={name}");
++        // Use the instance fullname as the host name so the SRV target and
++        // the A records are resolvable under the name clients actually query
++        // (the instance name), not a bare unresolvable label.
++        let host_name = format!("{}.{}", name, "_FC9F5ED42C8A._tcp.local");
++        info!("Broadcasting with: device_name={device_name}, host_name={host_name}");
+         let endpoint_info = gen_mdns_endpoint_info(device_type as u8, &device_name);
+ 
+         let properties = [("n", endpoint_info)];
+         let si = ServiceInfo::new(
+             "_FC9F5ED42C8A._tcp.local.",
+             &name,
+-            &name, // Needs to be ASCII?
++            &host_name,
+             "",
+             service_port,
+             &properties[..],

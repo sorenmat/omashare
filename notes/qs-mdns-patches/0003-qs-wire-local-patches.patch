@@ -1,0 +1,25 @@
+diff --git i/Cargo.toml w/Cargo.toml
+index ace543d..12a77a0 100644
+--- i/Cargo.toml
++++ w/Cargo.toml
+@@ -12,7 +12,9 @@ name = "qs"
+ path = "src/main.rs"
+ 
+ [dependencies]
+-rqs_lib = { git = "https://github.com/martinalderson/rquickshare.git", branch = "feat/ble-receiver-connect-back" }
++# Local working copies: mDNS receiver-record fixes (case-insensitive A match +
++# instance-FQDN hostname so clients can resolve the receiver's IP:port).
++rqs_lib = { path = "../rquickshare/core_lib" }
+ anyhow = "1"
+ clap = { version = "4", features = ["derive"] }
+ tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "time", "sync"] }
+@@ -22,6 +24,9 @@ dialoguer = "0.11"
+ serde_json = "1"
+ directories = "6"
+ 
++[patch."https://github.com/Martichou/mdns-sd"]
++mdns-sd = { path = "../mdns-sd" }
++
+ [profile.release]
+ lto = true
+ opt-level = 3
