@@ -137,6 +137,11 @@ Item {
     if (dir !== "") Quickshell.execDetached(["xdg-open", dir])
   }
 
+  function openFile(path) {
+    var value = String(path || "")
+    if (value !== "") Quickshell.execDetached(["xdg-open", value])
+  }
+
   function openFolderOf(path) {
     var value = String(path || "")
     var at = value.lastIndexOf("/")

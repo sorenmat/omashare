@@ -521,7 +521,13 @@ Panel {
               MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onClicked: if (root.engine) root.engine.openFolderOf(modelData.path)
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                // Left opens the file itself, right its containing folder.
+                onClicked: function(mouse) {
+                  if (!root.engine) return
+                  if (mouse.button === Qt.RightButton) root.engine.openFolderOf(modelData.path)
+                  else root.engine.openFile(modelData.path)
+                }
               }
             }
           }
