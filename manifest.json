@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "smo.omashare",
   "name": "OmaShare",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "smo",
   "license": "MIT",
   "description": "Receive and send files with your Android phone over Google Quick Share (Nearby Share), native to the Omarchy bar.",

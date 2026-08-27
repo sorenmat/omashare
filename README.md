@@ -41,9 +41,11 @@ PID, and leftovers from a SIGKILLed helper are reaped at the next start.
 ## Requirements
 
 - Omarchy (Arch-based shell: Hyprland + Quickshell)
-- The [qs CLI](https://github.com/martinalderson/qs):
+- The `qs` CLI — **use the omaShare fork**, which carries the receiver
+  fixes phones need (upstream advertises mDNS records phones cannot
+  resolve, so sends fail or crawl over Bluetooth):
   ```sh
-  cargo install --git https://github.com/martinalderson/qs
+  cargo install --git https://github.com/sorenmat/qs --branch omashare --bin qs
   ```
   (The plugin probes `~/.cargo/bin/qs`, `~/.local/bin/qs`, and then `PATH`,
   verifying each candidate by its `qs x.y.z` version banner — a `qs` on PATH
@@ -116,9 +118,14 @@ omarchy plugin validate .    # manifest schema check
 - Receiving runs `qs receive` with auto-accept (`-y`); the receiver is
   discoverable to everyone on the network while enabled.
 - As of qs `a63bc7b` (Aug 2026), upstream `qs` advertises an unresolvable
-  mDNS receiver record and phones fail with *waiting → failed*. The
-  `qs` on this machine is built with local fixes; see
-  [`notes/qs-mdns-patches/`](notes/qs-mdns-patches/README.md).
+  mDNS receiver record and phones fail with *waiting → failed*. Install
+  `qs` from the fork instead: [`sorenmat/qs`, branch
+  `omashare`](https://github.com/sorenmat/qs/tree/omashare) (which pulls
+  patched [`rquickshare`](https://github.com/sorenmat/rquickshare/tree/omashare)
+  and [`mdns-sd`](https://github.com/sorenmat/mdns-sd/tree/omashare));
+  the individual fixes are documented in
+  [`notes/qs-mdns-patches/`](notes/qs-mdns-patches/README.md) for
+  upstreaming.
 - Wi-Fi speed needs one firewall exception: phones connect directly to
   the receiver's advertised TCP port, which omaShare pins to 35353; a
   default-deny ufw drops that connect and the transfer falls back to

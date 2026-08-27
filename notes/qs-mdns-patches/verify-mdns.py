@@ -117,7 +117,16 @@ def listen(secs):
 
 print("phase 1: PTR for service type")
 s.sendto(q(TYPE, 12), ("224.0.0.251", 5353))
-instances = {v for t, *rest in listen(2.5) if t == "PTR" for v in [rest[0]]}
+# Keep only instances of our service type: other devices announce
+# concurrently on the multicast group and their PTRs land in the window.
+suffix = "." + TYPE
+instances = {
+    v
+    for t, *rest in listen(2.5)
+    if t == "PTR"
+    for v in [rest[0]]
+    if v.endswith(suffix)
+}
 print(" instances:", instances or "(none)")
 if not instances:
     raise SystemExit(1)

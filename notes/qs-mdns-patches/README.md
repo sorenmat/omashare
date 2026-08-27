@@ -81,14 +81,30 @@ BLE: slow but working). The receiver logs the protocol into the shell
 journal (`RUST_LOG=info,rqs_lib=debug,mdns_sd=warn`), including
 `BWU: phone connected over TCP from …` when an upgrade does complete.
 
-## Rebuilding qs from a clean machine
+## Installing qs
+
+The fixes live in published forks, so one command installs a working
+receiver:
+
+```sh
+cargo install --git https://github.com/sorenmat/qs --branch omashare --bin qs
+```
+
+That repo pins `rqs_lib` to [sorenmat/rquickshare `omashare`](https://github.com/sorenmat/rquickshare/tree/omashare)
+and patches `mdns-sd` to [sorenmat/mdns-sd `omashare`](https://github.com/sorenmat/mdns-sd/tree/omashare);
+the commit messages there describe each fix.
+
+## Rebuilding by applying the patches yourself
+
+The patch files in this directory are the same changes, kept for
+reviewing and upstreaming:
 
 ```sh
 mkdir -p ~/code && cd ~/code
 git clone https://github.com/martinalderson/qs
 git clone -b feat/ble-receiver-connect-back https://github.com/martinalderson/rquickshare
 git clone -b unsolicited https://github.com/Martichou/mdns-sd
-cd qs-mdns-patches
+cd omashare/notes/qs-mdns-patches
 patch -p1 -d ../mdns-sd      < 0001-mdns-sd-*.patch
 patch -p1 -d ../rquickshare  < 0002-rquickshare-*.patch
 patch -p1 -d ../rquickshare  < 0004-rquickshare-*.patch
@@ -97,10 +113,6 @@ cd ../qs
 cargo install --path . --bin qs --root "$HOME/.local"
 omarchy restart shell   # let the omaShare service respawn the receiver
 ```
-
-On this host the patched working copies already live at
-`~/code/{qs,rquickshare,mdns-sd}`; the installed
-`~/.local/bin/qs` was built from them (2026-08-27).
 
 Verify the mDNS advertisement after restarting the shell (run on the
 machine hosting the receiver; stdlib only):
@@ -120,6 +132,6 @@ Expected end-to-end: the phone completes transfers;
   exception no longer matches (transfer then stays on BLE — slow but
   working). Pick another port in the patch and the `ufw allow` rule if
   35353 ever collides.
-- When upstream lands the fixes, drop the local patches and
-  `cargo install --git https://github.com/martinalderson/qs --bin qs
-  --root ~/.local` again.
+- When upstream lands the fixes, switch back to
+  `cargo install --git https://github.com/martinalderson/qs --bin qs`
+  and retire the forks.

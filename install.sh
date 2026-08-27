@@ -4,8 +4,10 @@
 #   ./install.sh            install this folder into ~/.config/omarchy/plugins
 #   ./install.sh --git URL  install from a git remote instead (omarchy plugin add)
 #
-# Requires the qs CLI (Quick Share client):
-#   cargo install --git https://github.com/martinalderson/qs
+# Requires the qs CLI (Quick Share client). Use the omaShare fork: upstream
+# advertises mDNS records phones cannot resolve, so sends fail or crawl over
+# Bluetooth. The fork also pins the receiver to TCP 35353 for firewalls.
+#   cargo install --git https://github.com/sorenmat/qs --branch omashare --bin qs
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -27,7 +29,7 @@ if QS_BIN="$(have_qs)"; then
   echo "Found qs: $QS_BIN ($("$QS_BIN" --version 2>/dev/null | head -n1))"
 else
   echo "WARNING: the qs CLI (Quick Share client) is not installed:"
-  echo "  cargo install --git https://github.com/martinalderson/qs"
+  echo "  cargo install --git https://github.com/sorenmat/qs --branch omashare --bin qs"
   echo "The plugin will install, but show an install hint in the bar until then."
 fi
 
