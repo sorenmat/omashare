@@ -173,7 +173,6 @@ Panel {
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
-            letterSpacing: Style.font.caption * 0.08
           }
         }
       }
@@ -501,7 +500,7 @@ Panel {
                   anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
-                  text: root.name
+                  text: name
                   color: root.foreground
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.bodySmall

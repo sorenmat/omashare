@@ -31,6 +31,13 @@ backoff) and emits one JSON event per line: `ready`, `listening`,
 `transfer_starting`, `file_received`, `transfer_done`, `transfer_failed`,
 `receiver_error`, `receiver_restarting`, `stopped`.
 
+Teardown: when the shell exits, quickshell SIGKILLs the helper, so it
+cannot run its own cleanup. The helper therefore spawns a small
+stdin-forwarding subshell that survives the kill; when the helper's
+command pipe closes it stops `qs` via a pid file, and the reader
+subshells exit on their own. Scratch dirs are named after the helper's
+PID, and leftovers from a SIGKILLed helper are reaped at the next start.
+
 ## Requirements
 
 - Omarchy (Arch-based shell: Hyprland + Quickshell)
@@ -100,6 +107,7 @@ omarchy-shell smo.omashare open   # opens the popup on the focused monitor
 node test/model.test.js      # pure-JS parser tests
 bash test/helper.test.sh     # helper end-to-end with a fake qs
 bash test/term.test.sh       # process-group TERM shutdown
+bash test/eof.test.sh        # teardown: pipe EOF leaves no receiver behind
 omarchy plugin validate .    # manifest schema check
 ```
 

@@ -104,8 +104,14 @@ Item {
   }
 
   function summonView(action) {
-    if (!shell || typeof shell[action] !== "function") return "unknown"
-    return shell[action](manifestPluginId, "{}") === false ? "unknown" : "ok"
+    if (!shell) return "unknown"
+    var ok = false
+    try {
+      ok = shell[action](manifestPluginId, "{}")
+    } catch (e) {
+      ok = false
+    }
+    return ok === true ? "ok" : "unknown"
   }
 
   function send(command) {
@@ -235,7 +241,7 @@ Item {
         enabled: root.receiverEnabled,
         listening: root.listening,
         transferring: root.transferring,
-        receiver: root.receiverEnabled && !root.qsMissing && root.helperProcess.running,
+        receiver: root.receiverEnabled && !root.qsMissing && helperProcess.running,
         qsMissing: root.qsMissing,
         qsVersion: root.qsVersion,
         helperVersion: root.helperVersion,
@@ -326,7 +332,7 @@ Item {
     if (root.restartAttempts < 4) {
       root.restartAttempts += 1
       root.lastError = "Receiver stopped, restarting…"
-      root.helperRestartTimer.restart()
+      helperRestartTimer.restart()
     } else {
       root.lastError = "Receiver keeps stopping; toggle Quick Share off and on to try again."
     }

@@ -117,12 +117,28 @@ QS_BIN="$(resolve_qs)" || {
 
 QS_VERSION="$("$QS_BIN" --version 2>/dev/null | head -n1)" || QS_VERSION=""
 
-WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/omashare.XXXXXX")" || exit 70
+# Name the workdir after the PID so later helpers can tell which stale
+# directories belong to dead helpers; fall back to a random name if the
+# number is already taken.
+WORKDIR="${TMPDIR:-/tmp}/omashare.$$"
+mkdir "$WORKDIR" 2>/dev/null || WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/omashare.XXXXXX")" || exit 70
+
+# Reap workdirs left behind by helpers that were SIGKILLed (a SIGKILL skips
+# the EXIT trap above): the dir name is the helper's PID, so any directory
+# with an all-numeric suffix whose owner is no longer running is garbage.
+for d in "${TMPDIR:-/tmp}"/omashare.*; do
+  [[ -d $d ]] || continue
+  owner="${d##*.}"
+  [[ $owner =~ ^[0-9]+$ ]] || continue
+  kill -0 "$owner" 2>/dev/null || rm -rf "$d" 2>/dev/null
+done
+
 trap 'rm -rf "$WORKDIR"' EXIT
 
 OUT="$WORKDIR/out"
 ERRF="$WORKDIR/err"
 EVT="$WORKDIR/events"
+QS_PID_FILE="$WORKDIR/qs.pid"
 : >"$OUT"
 : >"$ERRF"
 mkfifo "$EVT" || exit 70
@@ -141,11 +157,20 @@ exec 7<&0
 SHUTDOWN=0
 QS_PID=""
 
-# Forward stdin commands onto the event pipe as "C" lines.
+# Forward stdin commands onto the event pipe as "C" lines. When the
+# supervisor (the shell) exits or its service is unloaded, the write end of
+# the pipe closes and read returns EOF. Quickshell SIGKILLs the main helper
+# in the same teardown, so it cannot be relied on to process events any
+# more — this subshell is the only tree member that survives, and it stops
+# the receiver itself via the pid file. The readers exit on their own once
+# qs disappears (tail --pid).
 (
   while IFS= read -r cmd <&7; do
     printf 'C\t%s\n' "$cmd" >&9
   done
+  printf 'C\t{"command":"shutdown"}\n' >&9 2>/dev/null
+  qs_pid="$(cat "$QS_PID_FILE" 2>/dev/null)"
+  [[ -n $qs_pid ]] && kill "$qs_pid" 2>/dev/null
 ) &
 STDIN_PIPER=$!
 
@@ -213,6 +238,10 @@ run_receiver() {
   "$QS_BIN" receive --yes ${OUT_DIR:+"-o" "$OUT_DIR"} ${DEVICE_NAME:+"--name" "$DEVICE_NAME"} \
     >"$OUT" 2>"$ERRF" &
   QS_PID=$!
+  # The stdin forwarder is the only member of this tree that quickshell does
+  # not SIGKILL itself when the shell goes down; it reads this file to stop
+  # the receiver when it sees its command pipe close.
+  echo "$QS_PID" >"$QS_PID_FILE"
 
   reader S "$OUT" "$QS_PID" &
   READER_S=$!
