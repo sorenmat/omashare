@@ -125,6 +125,16 @@ Expected end-to-end: the phone completes transfers;
 `omarchy-shell smo.omashare status` shows `transferring:true` briefly and
 `recent` increments.
 
+## Upstreaming
+
+The fixes are proposed upstream:
+
+- Martichou/mdns-sd#1 (branch `unsolicited`) — A-query matching +
+  addr-auto seeding.
+- martinalderson/rquickshare#3 (branch
+  `feat/ble-receiver-connect-back`) — resolvable mDNS hostname +
+  pinned BWU port.
+
 ## Caveats
 
 - The 0004 BWU port (35353/tcp) is a local choice; if something else on
