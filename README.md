@@ -64,6 +64,10 @@ omarchy restart shell
 
 The widget lands on the right side of the bar.
 
+![omaShare popup](docs/popup.png)
+
+To remove the plugin: `omarchy plugin remove smo.omashare`.
+
 ## Usage
 
 - **Left-click** the bar icon — status popup:
