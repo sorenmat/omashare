@@ -73,7 +73,7 @@ Item {
   property string sendPath: ""
   property string sendError: ""
 
-  readonly property string installCommand: "cargo install --git https://github.com/sorenmat/qs --branch omashare --bin qs"
+  readonly property string installCommand: "cargo install --git https://github.com/sorenmat/qs --rev 7a5409bce9ea74140b688598ccc0ddf1730e5c54 --bin qs"
 
   // The helper is restarted when receiver settings change: command identity
   // is what Quickshell's Process uses to decide that a running child has to

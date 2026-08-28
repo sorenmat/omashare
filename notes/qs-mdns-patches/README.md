@@ -84,10 +84,13 @@ journal (`RUST_LOG=info,rqs_lib=debug,mdns_sd=warn`), including
 ## Installing qs
 
 The fixes live in published forks, so one command installs a working
-receiver:
+receiver. The `--rev` pins the exact reviewed commit (the marketplace
+security baseline requires it); when the fork is intentionally
+updated, bump the SHA here, in `install.sh`, `Service.qml`, and the
+helper's hint in the same plugin commit:
 
 ```sh
-cargo install --git https://github.com/sorenmat/qs --branch omashare --bin qs
+cargo install --git https://github.com/sorenmat/qs --rev 7a5409bce9ea74140b688598ccc0ddf1730e5c54 --bin qs
 ```
 
 That repo pins `rqs_lib` to [sorenmat/rquickshare `omashare`](https://github.com/sorenmat/rquickshare/tree/omashare)

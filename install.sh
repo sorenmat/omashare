@@ -7,7 +7,7 @@
 # Requires the qs CLI (Quick Share client). Use the omaShare fork: upstream
 # advertises mDNS records phones cannot resolve, so sends fail or crawl over
 # Bluetooth. The fork also pins the receiver to TCP 35353 for firewalls.
-#   cargo install --git https://github.com/sorenmat/qs --branch omashare --bin qs
+#   cargo install --git https://github.com/sorenmat/qs --rev 7a5409bce9ea74140b688598ccc0ddf1730e5c54 --bin qs
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -29,7 +29,7 @@ if QS_BIN="$(have_qs)"; then
   echo "Found qs: $QS_BIN ($("$QS_BIN" --version 2>/dev/null | head -n1))"
 else
   echo "WARNING: the qs CLI (Quick Share client) is not installed:"
-  echo "  cargo install --git https://github.com/sorenmat/qs --branch omashare --bin qs"
+  echo "  cargo install --git https://github.com/sorenmat/qs --rev 7a5409bce9ea74140b688598ccc0ddf1730e5c54 --bin qs"
   echo "The plugin will install, but show an install hint in the bar until then."
 fi
 
