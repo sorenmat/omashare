@@ -22,7 +22,7 @@
 set -u
 
 VERSION="1.0.0"
-INSTALL_HINT="Install the qs CLI: cargo install --git https://github.com/sorenmat/qs --rev 7a5409bce9ea74140b688598ccc0ddf1730e5c54 --bin qs"
+INSTALL_HINT='Install the qs CLI: cargo install --git https://github.com/sorenmat/qs --rev 7a5409bce9ea74140b688598ccc0ddf1730e5c54 --bin qs --root "$HOME/.local/share/omashare"'
 
 OUT_DIR=""
 DEVICE_NAME=""
@@ -110,7 +110,7 @@ fi
 # not be run as the receiver.
 resolve_qs() {
   local p v
-  for p in "$HOME/.cargo/bin/qs" "$HOME/.local/bin/qs" "$(command -v qs 2>/dev/null)"; do
+  for p in "$HOME/.local/share/omashare/bin/qs" "$HOME/.cargo/bin/qs" "$HOME/.local/bin/qs" "$(command -v qs 2>/dev/null)"; do
     [[ -n $p && -x $p ]] || continue
     v="$("$p" --version 2>/dev/null | head -n1)" || continue
     if [[ $v =~ ^qs\ [0-9] ]]; then

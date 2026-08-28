@@ -45,9 +45,11 @@ PID, and leftovers from a SIGKILLed helper are reaped at the next start.
   fixes phones need (upstream advertises mDNS records phones cannot
   resolve, so sends fail or crawl over Bluetooth):
   ```sh
-  cargo install --git https://github.com/sorenmat/qs --rev 7a5409bce9ea74140b688598ccc0ddf1730e5c54 --bin qs
+  cargo install --git https://github.com/sorenmat/qs --rev 7a5409bce9ea74140b688598ccc0ddf1730e5c54 --bin qs --root "$HOME/.local/share/omashare"
   ```
-  (The plugin probes `~/.cargo/bin/qs`, `~/.local/bin/qs`, and then `PATH`,
+  (The private install keeps Quick Share's `qs` out of `PATH`, where it would
+  shadow Quickshell's own `qs`. The plugin probes that private path first,
+  followed by legacy user install locations and then `PATH`,
   verifying each candidate by its `qs x.y.z` version banner — a `qs` on PATH
   that is actually Quickshell is skipped.)
 - `jq`

@@ -8,9 +8,9 @@ FAKEHOME="$(mktemp -d /tmp/omashare-fake.XXXXXX)"
 OUTDIR="$FAKEHOME/out"
 trap 'rm -rf "$FAKEHOME"' EXIT
 
-mkdir -p "$FAKEHOME/.local/bin" "$OUTDIR"
-cp "$HERE/fakeqs" "$FAKEHOME/.local/bin/qs"
-chmod +x "$FAKEHOME/.local/bin/qs"
+mkdir -p "$FAKEHOME/.local/share/omashare/bin" "$OUTDIR"
+cp "$HERE/fakeqs" "$FAKEHOME/.local/share/omashare/bin/qs"
+chmod +x "$FAKEHOME/.local/share/omashare/bin/qs"
 
 LOG="$FAKEHOME/events.jsonl"
 
@@ -18,7 +18,7 @@ LOG="$FAKEHOME/events.jsonl"
 # after the scripted transfer has been observed. The timeout is a hang guard:
 # a well-behaved run finishes in under 10s.
 ( sleep 7; printf '{"command":"shutdown"}\n' ) |
-  HOME="$FAKEHOME" timeout 25 bash "$ROOT/helpers/omashare-helper" --out "$OUTDIR" --name TestBox \
+  HOME="$FAKEHOME" PATH="/usr/bin:/bin" timeout 25 bash "$ROOT/helpers/omashare-helper" --out "$OUTDIR" --name TestBox \
   >"$LOG" 2>"$FAKEHOME/err.log"
 CODE=$?
 

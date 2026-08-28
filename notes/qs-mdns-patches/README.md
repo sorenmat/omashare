@@ -90,7 +90,7 @@ updated, bump the SHA here, in `install.sh`, `Service.qml`, and the
 helper's hint in the same plugin commit:
 
 ```sh
-cargo install --git https://github.com/sorenmat/qs --rev 7a5409bce9ea74140b688598ccc0ddf1730e5c54 --bin qs
+cargo install --git https://github.com/sorenmat/qs --rev 7a5409bce9ea74140b688598ccc0ddf1730e5c54 --bin qs --root "$HOME/.local/share/omashare"
 ```
 
 That repo pins `rqs_lib` to [sorenmat/rquickshare `omashare`](https://github.com/sorenmat/rquickshare/tree/omashare)
@@ -113,7 +113,7 @@ patch -p1 -d ../rquickshare  < 0002-rquickshare-*.patch
 patch -p1 -d ../rquickshare  < 0004-rquickshare-*.patch
 patch -p1 -d ../qs           < 0003-qs-*.patch
 cd ../qs
-cargo install --path . --bin qs --root "$HOME/.local"
+cargo install --path . --bin qs --root "$HOME/.local/share/omashare"
 omarchy restart shell   # let the omaShare service respawn the receiver
 ```
 
@@ -146,5 +146,5 @@ The fixes are proposed upstream:
   working). Pick another port in the patch and the `ufw allow` rule if
   35353 ever collides.
 - When upstream lands the fixes, switch back to
-  `cargo install --git https://github.com/martinalderson/qs --bin qs`
+  `cargo install --git https://github.com/martinalderson/qs --bin qs --root "$HOME/.local/share/omashare"`
   and retire the forks.

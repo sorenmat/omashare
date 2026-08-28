@@ -73,7 +73,7 @@ Item {
   property string sendPath: ""
   property string sendError: ""
 
-  readonly property string installCommand: "cargo install --git https://github.com/sorenmat/qs --rev 7a5409bce9ea74140b688598ccc0ddf1730e5c54 --bin qs"
+  readonly property string installCommand: "cargo install --git https://github.com/sorenmat/qs --rev 7a5409bce9ea74140b688598ccc0ddf1730e5c54 --bin qs --root \"$HOME/.local/share/omashare\""
 
   // The helper is restarted when receiver settings change: command identity
   // is what Quickshell's Process uses to decide that a running child has to
@@ -296,7 +296,7 @@ Item {
     // tried first and every candidate is verified by its version banner
     // ("qs 0.1.0" — Quickshell prints "Quickshell …") before being trusted.
     command: ["bash", "-c",
-      "for p in \"$HOME/.cargo/bin/qs\" \"$HOME/.local/bin/qs\" \"$(command -v qs 2>/dev/null)\"; do"
+      "for p in \"$HOME/.local/share/omashare/bin/qs\" \"$HOME/.cargo/bin/qs\" \"$HOME/.local/bin/qs\" \"$(command -v qs 2>/dev/null)\"; do"
       + " [ -x \"$p\" ] || continue;"
       + " case \"$($p --version 2>/dev/null | head -n1)\" in"
       + "  qs\\ [0-9]*) echo \"$p\"; exit 0 ;;"
